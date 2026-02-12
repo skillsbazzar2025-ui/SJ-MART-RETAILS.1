@@ -1,0 +1,253 @@
+const User = require('../models/User');
+const { sendWelcomeEmail, sendMembershipActivation } = require('../config/email');
+
+// @desc    Register User
+// @route   POST /auth/register
+exports.register = async (req, res) => {
+    try {
+        const { name, email, password, phone, address } = req.body;
+
+        // Check if user exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Email already registered' 
+            });
+        }
+
+        // Create user
+        const user = await User.create({
+            name,
+            email,
+            password,
+            phone,
+            address
+        });
+
+        // Set session
+        req.session.user = {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            isMember: user.isMember,
+            role: user.role
+        };
+        req.session.cartCount = 0;
+
+        // Send welcome email
+        await sendWelcomeEmail(user);
+
+        res.status(201).json({
+            success: true,
+            message: 'Registration successful',
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                isMember: user.isMember,
+                role: user.role
+            }
+        });
+
+    } catch (error) {
+        console.error('Registration error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Registration failed', 
+            error: error.message 
+        });
+    }
+};
+
+// @desc    Login User
+// @route   POST /auth/login
+exports.login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // Find user with password
+        const user = await User.findOne({ email }).select('+password');
+        
+        if (!user) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Invalid credentials' 
+            });
+        }
+
+        // Check password
+        const isMatch = await user.comparePassword(password);
+        
+        if (!isMatch) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Invalid credentials' 
+            });
+        }
+
+        // Check if account is active
+        if (!user.isActive) {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Account is deactivated. Contact support.' 
+            });
+        }
+
+        // Update last login
+        await user.updateLastLogin();
+
+        // Set session
+        req.session.user = {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            isMember: user.isMember,
+            role: user.role,
+            membershipId: user.membershipId
+        };
+
+        // Get cart count from session or database
+        req.session.cartCount = req.session.cartCount || 0;
+
+        res.json({
+            success: true,
+            message: 'Login successful',
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                isMember: user.isMember,
+                role: user.role,
+                membershipId: user.membershipId,
+                membershipExpiry: user.membershipExpiry,
+                daysRemaining: user.getMembershipDaysRemaining()
+            }
+        });
+
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Login failed', 
+            error: error.message 
+        });
+    }
+};
+
+// @desc    Logout User
+// @route   GET /auth/logout
+exports.logout = (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            return res.status(500).json({ 
+                success: false, 
+                message: 'Logout failed' 
+            });
+        }
+        res.clearCookie('connect.sid');
+        res.json({ 
+            success: true, 
+            message: 'Logged out successfully' 
+        });
+    });
+};
+
+// @desc    Get Current User
+// @route   GET /auth/me
+exports.getMe = async (req, res) => {
+    try {
+        const user = await User.findById(req.session.user.id)
+            .select('-password')
+            .populate('orders', 'orderId totalAmount orderStatus createdAt');
+
+        res.json({
+            success: true,
+            user: {
+                ...user.toObject(),
+                daysRemaining: user.getMembershipDaysRemaining(),
+                isMembershipActive: user.isMembershipActive()
+            }
+        });
+    } catch (error) {
+        console.error('Get profile error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to fetch profile' 
+        });
+    }
+};
+
+// @desc    Update Profile
+// @route   PUT /auth/profile
+exports.updateProfile = async (req, res) => {
+    try {
+        const { name, phone, address } = req.body;
+        
+        const user = await User.findById(req.session.user.id);
+        
+        if (name) user.name = name;
+        if (phone) user.phone = phone;
+        if (address) user.address = { ...user.address, ...address };
+
+        await user.save();
+
+        res.json({
+            success: true,
+            message: 'Profile updated successfully',
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                address: user.address
+            }
+        });
+    } catch (error) {
+        console.error('Update profile error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to update profile' 
+        });
+    }
+};
+
+// @desc    Activate Membership
+// @route   POST /auth/membership/activate
+exports.activateMembership = async (req, res) => {
+    try {
+        const user = await User.findById(req.session.user.id);
+        
+        if (user.isMember && user.isMembershipActive()) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Membership already active' 
+            });
+        }
+
+        user.isMember = true;
+        await user.save();
+
+        // Send membership activation email
+        await sendMembershipActivation(user);
+
+        // Update session
+        req.session.user.isMember = true;
+        req.session.user.membershipId = user.membershipId;
+
+        res.json({
+            success: true,
+            message: 'Membership activated successfully',
+            membershipId: user.membershipId,
+            expiryDate: user.membershipExpiry,
+            daysRemaining: user.getMembershipDaysRemaining()
+        });
+
+    } catch (error) {
+        console.error('Membership activation error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to activate membership' 
+        });
+    }
+};
