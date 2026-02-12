@@ -1,0 +1,316 @@
+<%- include('partials/header') %>
+
+<!-- Hero Section -->
+<section class="hero">
+    <div class="hero-container">
+        <div class="hero-content">
+            <span class="hero-badge">Fresh From Farm</span>
+            <h2>Freshness <span>Locked In</span><br>With Membership</h2>
+            <p class="hero-tagline">Home-Grade Freshness. Planned Supply. Trusted Quality.</p>
+            
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <div class="stat-number">5000+</div>
+                    <div class="stat-label">Happy Members</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">100+</div>
+                    <div class="stat-label">Fresh Products</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">24h</div>
+                    <div class="stat-label">Farm to Home</div>
+                </div>
+            </div>
+            
+            <div class="hero-buttons">
+                <a href="/shop" class="btn btn-primary">
+                    <i class="fas fa-shopping-bag"></i>
+                    Shop Now
+                </a>
+                <a href="/membership" class="btn btn-outline">
+                    <i class="fas fa-crown"></i>
+                    Become a Member
+                </a>
+            </div>
+        </div>
+        <div class="hero-image">
+            <img src="https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=600" alt="Fresh vegetables and fruits">
+            <div class="hero-badge-card">
+                <i class="fas fa-truck"></i>
+                <span>Free delivery on ₹499+</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Strip -->
+<section class="features-strip">
+    <div class="container">
+        <div class="features-grid">
+            <div class="feature">
+                <i class="fas fa-leaf"></i>
+                <div>
+                    <h4>100% Fresh</h4>
+                    <p>Harvested daily</p>
+                </div>
+            </div>
+            <div class="feature">
+                <i class="fas fa-lock"></i>
+                <div>
+                    <h4>Price Lock</h4>
+                    <p>1 year guarantee</p>
+                </div>
+            </div>
+            <div class="feature">
+                <i class="fas fa-clock"></i>
+                <div>
+                    <h4>24h Delivery</h4>
+                    <p>Farm to home</p>
+                </div>
+            </div>
+            <div class="feature">
+                <i class="fas fa-crown"></i>
+                <div>
+                    <h4>Member Savings</h4>
+                    <p>Up to 20% off</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Categories Section -->
+<section class="categories-section">
+    <div class="container">
+        <div class="section-header">
+            <h2 class="section-title">Shop by Category</h2>
+            <p class="section-subtitle">Fresh from farm to your table</p>
+        </div>
+        
+        <div class="categories-grid">
+            <div class="category-card">
+                <div class="category-icon">
+                    <i class="fas fa-carrot"></i>
+                </div>
+                <h3>Fresh Vegetables</h3>
+                <p>Farm-fresh seasonal vegetables</p>
+                <a href="/category/fresh-vegetables" class="category-link">
+                    Shop Now <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            
+            <div class="category-card">
+                <div class="category-icon">
+                    <i class="fas fa-cube"></i>
+                </div>
+                <h3>Diced Vegetables</h3>
+                <p>Pre-cut, ready to cook</p>
+                <a href="/category/diced-vegetables" class="category-link">
+                    Shop Now <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            
+            <div class="category-card">
+                <div class="category-icon">
+                    <i class="fas fa-apple-alt"></i>
+                </div>
+                <h3>Fresh Fruits</h3>
+                <p>Premium quality fruits</p>
+                <a href="/category/fresh-fruits" class="category-link">
+                    Shop Now <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            
+            <div class="category-card">
+                <div class="category-icon">
+                    <i class="fas fa-lemon"></i>
+                </div>
+                <h3>Diced Fruits</h3>
+                <p>Fresh cut fruit cups</p>
+                <a href="/category/diced-fruits" class="category-link">
+                    Shop Now <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            
+            <div class="category-card">
+                <div class="category-icon">
+                    <i class="fas fa-salad"></i>
+                </div>
+                <h3>Fresh Salad</h3>
+                <p>Washed & ready to eat</p>
+                <a href="/category/fresh-salad" class="category-link">
+                    Shop Now <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Featured Products -->
+<section class="featured-section">
+    <div class="container">
+        <div class="section-header">
+            <h2 class="section-title">Today's Fresh Picks</h2>
+            <p class="section-subtitle">Handpicked just for you</p>
+            <a href="/shop" class="view-all">View All <i class="fas fa-arrow-right"></i></a>
+        </div>
+        
+        <div class="products-grid">
+            <% if (featuredProducts && featuredProducts.length) { %>
+                <% featuredProducts.forEach(product => { %>
+                    <%- include('partials/product-card', { product }) %>
+                <% }) %>
+            <% } else { %>
+                <!-- Static products for demo -->
+                <div class="product-card">
+                    <span class="badge member-price"><i class="fas fa-crown"></i> Member Price</span>
+                    <div class="product-image">
+                        <img src="https://images.unsplash.com/photo-1546470427-ff77671343c7?w=400" alt="Tomatoes">
+                    </div>
+                    <div class="product-info">
+                        <span class="product-category">Fresh Vegetables</span>
+                        <h3 class="product-name">Organic Tomatoes</h3>
+                        <div class="product-price">
+                            <span class="member-price">₹45</span>
+                            <span class="regular-price">₹60</span>
+                            <span class="discount">25% off</span>
+                        </div>
+                        <button class="add-to-cart">
+                            <i class="fas fa-shopping-cart"></i>
+                            Add to Cart
+                        </button>
+                    </div>
+                </div>
+                <!-- Add more static products -->
+            <% } %>
+        </div>
+    </div>
+</section>
+
+<!-- Membership Banner -->
+<section class="membership-banner">
+    <div class="container">
+        <div class="banner-content">
+            <div class="banner-text">
+                <span class="banner-badge">Limited Time Offer</span>
+                <h2>Unlock Member Prices</h2>
+                <p>Save up to 20% on every order + FREE delivery</p>
+                <div class="price-tag">
+                    <span class="price">₹499</span>
+                    <span class="duration">/year</span>
+                </div>
+                <ul class="benefits-list">
+                    <li><i class="fas fa-check-circle"></i> Exclusive member pricing</li>
+                    <li><i class="fas fa-check-circle"></i> Price lock for 1 year</li>
+                    <li><i class="fas fa-check-circle"></i> Priority delivery slots</li>
+                    <li><i class="fas fa-check-circle"></i> Free delivery above ₹299</li>
+                </ul>
+                <a href="/membership" class="btn btn-primary btn-large">
+                    Activate Membership <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            <div class="banner-image">
+                <img src="https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=400" alt="Fresh produce">
+                <div class="savings-badge">
+                    Save ₹2000+<br>per year
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Testimonials -->
+<section class="testimonials">
+    <div class="container">
+        <div class="section-header">
+            <h2 class="section-title">What Our Members Say</h2>
+            <p class="section-subtitle">Trusted by 5000+ happy families</p>
+        </div>
+        
+        <div class="testimonials-grid">
+            <div class="testimonial-card">
+                <div class="testimonial-rating">
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                </div>
+                <p class="testimonial-text">"The quality of vegetables is amazing. Member prices make it so affordable for weekly shopping."</p>
+                <div class="testimonial-author">
+                    <i class="fas fa-user-circle"></i>
+                    <div>
+                        <h4>Rajesh Kumar</h4>
+                        <span>Member since 2024</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="testimonial-card">
+                <div class="testimonial-rating">
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                </div>
+                <p class="testimonial-text">"Love the diced vegetables! Saves so much time in kitchen. Always fresh and perfectly cut."</p>
+                <div class="testimonial-author">
+                    <i class="fas fa-user-circle"></i>
+                    <div>
+                        <h4>Priya Sharma</h4>
+                        <span>Member since 2024</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="testimonial-card">
+                <div class="testimonial-rating">
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                </div>
+                <p class="testimonial-text">"Delivery is always on time. The price lock feature is a lifesaver with inflation!"</p>
+                <div class="testimonial-author">
+                    <i class="fas fa-user-circle"></i>
+                    <div>
+                        <h4>Amit Patel</h4>
+                        <span>Member since 2024</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Download App -->
+<section class="app-download">
+    <div class="container">
+        <div class="app-content">
+            <div class="app-text">
+                <h2>Download Our App</h2>
+                <p>Order fresh vegetables & fruits on the go</p>
+                <div class="app-badges">
+                    <a href="#" class="app-badge">
+                        <img src="/images/google-play.svg" alt="Google Play">
+                    </a>
+                    <a href="#" class="app-badge">
+                        <img src="/images/app-store.svg" alt="App Store">
+                    </a>
+                </div>
+                <div class="qr-code">
+                    <img src="/images/qr-code.svg" alt="Scan to download">
+                    <span>Scan to download</span>
+                </div>
+            </div>
+            <div class="app-image">
+                <img src="/images/app-mockup.png" alt="SJ Mart App">
+            </div>
+        </div>
+    </div>
+</section>
+
+<%- include('partials/footer') %>
