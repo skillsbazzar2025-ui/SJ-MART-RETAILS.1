@@ -1,0 +1,393 @@
+/**
+ * General Helper Functions
+ * SJ Mart Retails - Production Ready
+ */
+
+// ============ FORMATTING ============
+
+// Format currency (INR)
+exports.formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(amount);
+};
+
+// Format date
+exports.formatDate = (date, format = 'DD MMM YYYY') => {
+    const d = new Date(date);
+    const options = {
+        'DD MMM YYYY': { day: '2-digit', month: 'short', year: 'numeric' },
+        'DD/MM/YYYY': { day: '2-digit', month: '2-digit', year: 'numeric' },
+        'MMMM DD, YYYY': { month: 'long', day: 'numeric', year: 'numeric' }
+    };
+    return d.toLocaleDateString('en-IN', options[format] || options['DD MMM YYYY']);
+};
+
+// Format phone number
+exports.formatPhone = (phone) => {
+    if (!phone) return '';
+    const cleaned = phone.replace(/\D/g, '');
+    const match = cleaned.match(/^(\d{5})(\d{5})$/);
+    return match ? `${match[1]} ${match[2]}` : phone;
+};
+
+// Format order ID
+exports.formatOrderId = (orderId) => {
+    if (!orderId) return '';
+    return orderId.replace(/^ORD/, '#');
+};
+
+// Truncate text
+exports.truncateText = (text, length = 100) => {
+    if (!text) return '';
+    if (text.length <= length) return text;
+    return text.substring(0, length) + '...';
+};
+
+// ============ CALCULATIONS ============
+
+// Calculate discount percentage
+exports.calculateDiscount = (price, memberPrice) => {
+    if (!price || !memberPrice || price <= memberPrice) return 0;
+    return Math.round(((price - memberPrice) / price) * 100);
+};
+
+// Calculate delivery charge
+exports.calculateDeliveryCharge = (subtotal, freeAmount = 499, charge = 40) => {
+    return subtotal >= freeAmount ? 0 : charge;
+};
+
+// Calculate member savings
+exports.calculateSavings = (items, isMember = false) => {
+    if (!isMember) return 0;
+    return items.reduce((total, item) => {
+        const savings = (item.price - (item.memberPrice || item.price)) * item.quantity;
+        return total + (savings > 0 ? savings : 0);
+    }, 0);
+};
+
+// Calculate cart totals
+exports.calculateCartTotals = (items, isMember = false) => {
+    const subtotal = items.reduce((sum, item) => {
+        const price = isMember ? (item.memberPrice || item.price) : item.price;
+        return sum + (price * item.quantity);
+    }, 0);
+    
+    const discount = exports.calculateSavings(items, isMember);
+    const deliveryCharge = exports.calculateDeliveryCharge(subtotal);
+    
+    return { subtotal, discount, deliveryCharge, total: subtotal + deliveryCharge };
+};
+
+// ============ VALIDATION ============
+
+// Validate email
+exports.isValidEmail = (email) => {
+    const regex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    return regex.test(email);
+};
+
+// Validate Indian phone
+exports.isValidPhone = (phone) => {
+    const regex = /^[6-9]\d{9}$/;
+    return regex.test(phone);
+};
+
+// Validate pincode
+exports.isValidPincode = (pincode) => {
+    const regex = /^[1-9][0-9]{5}$/;
+    return regex.test(pincode);
+};
+
+// ============ SLUG ============
+
+// Generate slug
+exports.generateSlug = (text) => {
+    return text
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^\w\-]+/g, '')
+        .replace(/\-\-+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+$/, '');
+};
+
+// Generate unique ID
+exports.generateUniqueId = (prefix = '') => {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 8);
+    return `${prefix}${timestamp}${random}`.toUpperCase();
+};
+
+// ============ STATUS ============
+
+// Get stock status
+exports.getStockStatus = (stock) => {
+    if (stock <= 0) return { text: 'Out of Stock', class: 'out-of-stock', color: '#ef4444' };
+    if (stock <= 5) return { text: 'Low Stock', class: 'low-stock', color: '#f59e0b' };
+    if (stock <= 20) return { text: 'Limited Stock', class: 'limited-stock', color: '#3b82f6' };
+    return { text: 'In Stock', class: 'in-stock', color: '#10b981' };
+};
+
+// Get order status
+exports.getOrderStatus = (status) => {
+    const statuses = {
+        'pending': { label: 'Pending', color: '#f59e0b', icon: 'fa-clock' },
+        'confirmed': { label: 'Confirmed', color: '#3b82f6', icon: 'fa-check-circle' },
+        'processing': { label: 'Processing', color: '#8b5cf6', icon: 'fa-box' },
+        'shipped': { label: 'Shipped', color: '#06b6d4', icon: 'fa-truck' },
+        'delivered': { label: 'Delivered', color: '#10b981', icon: 'fa-circle-check' },
+        'cancelled': { label: 'Cancelled', color: '#ef4444', icon: 'fa-circle-xmark' }
+    };
+    return statuses[status] || statuses['pending'];
+};
+
+// Get payment status
+exports.getPaymentStatus = (status) => {
+    const statuses = {
+        'pending': { label: 'Pending', color: '#f59e0b' },
+        'paid': { label: 'Paid', color: '#10b981' },
+        'failed': { label: 'Failed', color: '#ef4444' },
+        'refunded': { label: 'Refunded', color: '#6b7280' }
+    };
+    return statuses[status] || statuses['pending'];
+};
+
+// ============ TIME ============
+
+// Get time ago
+exports.timeAgo = (date) => {
+    const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+    
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + ' years ago';
+    
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + ' months ago';
+    
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + ' days ago';
+    
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + ' hours ago';
+    
+    interval = seconds / 60;
+    if (interval > 1) return Math.floor(interval) + ' minutes ago';
+    
+    return Math.floor(seconds) + ' seconds ago';
+};
+
+// Get delivery slots
+exports.getDeliverySlots = () => {
+    const today = new Date();
+    const slots = [];
+    
+    for (let i = 1; i <= 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        slots.push({
+            date,
+            formatted: exports.formatDate(date, 'DD MMM YYYY'),
+            day: date.toLocaleDateString('en-IN', { weekday: 'short' }),
+            slots: [
+                { time: '07:00 - 10:00', value: 'morning', available: true },
+                { time: '12:00 - 15:00', value: 'afternoon', available: true },
+                { time: '17:00 - 20:00', value: 'evening', available: true }
+            ]
+        });
+    }
+    return slots;
+};
+
+// ============ STRING ============
+
+// Capitalize first letter
+exports.capitalizeFirst = (string) => {
+    if (!string) return '';
+    return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
+};
+
+// Title case
+exports.titleCase = (string) => {
+    if (!string) return '';
+    return string.toLowerCase().split(' ').map(word => {
+        return word.charAt(0).toUpperCase() + word.slice(1);
+    }).join(' ');
+};
+
+// Mask email
+exports.maskEmail = (email) => {
+    if (!email) return '';
+    const [name, domain] = email.split('@');
+    const maskedName = name.charAt(0) + '****' + name.charAt(name.length - 1);
+    return `${maskedName}@${domain}`;
+};
+
+// Mask phone
+exports.maskPhone = (phone) => {
+    if (!phone) return '';
+    return phone.replace(/(\d{2})\d{6}(\d{2})/, '$1******$2');
+};
+
+// ============ PRICE ============
+
+// Format price for display
+exports.formatPrice = (price) => {
+    return `₹${price}`;
+};
+
+// Calculate EMI (placeholder)
+exports.calculateEMI = (amount, months = 3) => {
+    const interest = 0.12; // 12% per annum
+    const monthlyRate = interest / 12;
+    const emi = (amount * monthlyRate * Math.pow(1 + monthlyRate, months)) / 
+                (Math.pow(1 + monthlyRate, months) - 1);
+    return Math.round(emi);
+};
+
+// ============ WEIGHT ============
+
+// Convert kg to g
+exports.kgToGrams = (kg) => {
+    return kg * 1000;
+};
+
+// Convert g to kg
+exports.gramsToKg = (grams) => {
+    return grams / 1000;
+};
+
+// Format weight
+exports.formatWeight = (value, unit) => {
+    if (unit === 'kg') return `${value} kg`;
+    if (unit === 'g') return `${value}g`;
+    if (unit === 'dozen') return `${value} dozen`;
+    if (unit === 'piece') return `${value} pc${value > 1 ? 's' : ''}`;
+    if (unit === 'bunch') return `${value} bunch${value > 1 ? 'es' : ''}`;
+    return `${value} ${unit}`;
+};
+
+// ============ ARRAY ============
+
+// Chunk array
+exports.chunkArray = (array, size) => {
+    return array.reduce((chunks, item, index) => {
+        const chunkIndex = Math.floor(index / size);
+        if (!chunks[chunkIndex]) chunks[chunkIndex] = [];
+        chunks[chunkIndex].push(item);
+        return chunks;
+    }, []);
+};
+
+// Group by key
+exports.groupBy = (array, key) => {
+    return array.reduce((result, item) => {
+        const groupKey = item[key];
+        if (!result[groupKey]) result[groupKey] = [];
+        result[groupKey].push(item);
+        return result;
+    }, {});
+};
+
+// Sort by key
+exports.sortBy = (array, key, order = 'asc') => {
+    return [...array].sort((a, b) => {
+        if (order === 'asc') {
+            return a[key] > b[key] ? 1 : -1;
+        }
+        return a[key] < b[key] ? 1 : -1;
+    });
+};
+
+// ============ URL ============
+
+// Get query params
+exports.getQueryParams = (url) => {
+    const params = {};
+    const searchParams = new URLSearchParams(url.split('?')[1]);
+    for (const [key, value] of searchParams) {
+        params[key] = value;
+    }
+    return params;
+};
+
+// Build URL with params
+exports.buildUrl = (base, params) => {
+    const url = new URL(base, process.env.BASE_URL);
+    Object.keys(params).forEach(key => {
+        if (params[key]) url.searchParams.append(key, params[key]);
+    });
+    return url.toString();
+};
+
+// ============ COOKIE ============
+
+// Parse cookie
+exports.parseCookie = (cookieString) => {
+    return cookieString.split(';').reduce((cookies, cookie) => {
+        const [name, value] = cookie.trim().split('=');
+        cookies[name] = decodeURIComponent(value);
+        return cookies;
+    }, {});
+};
+
+// ============ RATING ============
+
+// Get star rating
+exports.getStarRating = (rating) => {
+    const fullStars = Math.floor(rating);
+    const halfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
+    
+    return {
+        full: fullStars,
+        half: halfStar,
+        empty: emptyStars,
+        percentage: (rating / 5) * 100
+    };
+};
+
+// ============ DISCOUNT ============
+
+// Calculate bulk discount
+exports.calculateBulkDiscount = (quantity, price) => {
+    if (quantity >= 50) return price * 0.25; // 25% off
+    if (quantity >= 20) return price * 0.15; // 15% off
+    if (quantity >= 10) return price * 0.10; // 10% off
+    if (quantity >= 5) return price * 0.05;  // 5% off
+    return 0;
+};
+
+// ============ COLOR ============
+
+// Get category color
+exports.getCategoryColor = (category) => {
+    const colors = {
+        'SJ Mart Fresh Vegetables': '#22c55e',
+        'SJ Mart Diced Vegetables': '#eab308',
+        'SJ Mart Fresh Fruits': '#ef4444',
+        'SJ Mart Diced Fruits': '#f97316',
+        'SJ Mart Fresh Salad': '#10b981'
+    };
+    return colors[category] || '#ff7a00';
+};
+
+// ============ MEMBERSHIP ============
+
+// Calculate membership price
+exports.calculateMemberPrice = (price, discountPercent = 20) => {
+    return Math.round(price - (price * discountPercent / 100));
+};
+
+// Calculate membership savings
+exports.calculateMemberSavings = (price, memberPrice) => {
+    return price - memberPrice;
+};
+
+// ============ EXPORT ============
+module.exports = exports;
