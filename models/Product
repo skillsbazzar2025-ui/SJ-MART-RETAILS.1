@@ -1,0 +1,380 @@
+const mongoose = require('mongoose');
+const slugify = require('slugify');
+
+const productSchema = new mongoose.Schema({
+    // Basic Information
+    name: {
+        type: String,
+        required: [true, 'Product name is required'],
+        trim: true,
+        minlength: [3, 'Product name must be at least 3 characters'],
+        maxlength: [100, 'Product name cannot exceed 100 characters']
+    },
+    slug: {
+        type: String,
+        unique: true,
+        lowercase: true
+    },
+    category: {
+        type: String,
+        required: [true, 'Category is required'],
+        enum: [
+            'SJ Mart Fresh Vegetables',
+            'SJ Mart Diced Vegetables',
+            'SJ Mart Fresh Fruits',
+            'SJ Mart Diced Fruits',
+            'SJ Mart Fresh Salad'
+        ]
+    },
+    
+    // Pricing
+    price: {
+        type: Number,
+        required: [true, 'Regular price is required'],
+        min: [0, 'Price cannot be negative'],
+        set: v => Math.round(v * 100) / 100 // Round to 2 decimals
+    },
+    memberPrice: {
+        type: Number,
+        required: [true, 'Member price is required'],
+        min: [0, 'Member price cannot be negative'],
+        validate: {
+            validator: function(v) {
+                return v <= this.price;
+            },
+            message: 'Member price must be less than or equal to regular price'
+        },
+        set: v => Math.round(v * 100) / 100
+    },
+    discountPercentage: {
+        type: Number,
+        default: function() {
+            return Math.round(((this.price - this.memberPrice) / this.price) * 100);
+        }
+    },
+    
+    // Inventory
+    stock: {
+        type: Number,
+        required: [true, 'Stock quantity is required'],
+        min: [0, 'Stock cannot be negative'],
+        default: 0
+    },
+    unit: {
+        type: String,
+        required: [true, 'Unit is required'],
+        enum: ['kg', 'g', 'dozen', 'piece', 'bunch', 'pack', 'box', '500g', '250g', '1kg', '2kg', '5kg']
+    },
+    minOrderQuantity: {
+        type: Number,
+        default: 1,
+        min: 1
+    },
+    maxOrderQuantity: {
+        type: Number,
+        default: 50
+    },
+    
+    // Images
+    images: [{
+        type: String,
+        default: ['/images/default-product.jpg']
+    }],
+    coverImage: {
+        type: String,
+        default: '/images/default-product.jpg'
+    },
+    
+    // Description
+    description: {
+        type: String,
+        maxlength: [2000, 'Description cannot exceed 2000 characters']
+    },
+    shortDescription: {
+        type: String,
+        maxlength: [200, 'Short description cannot exceed 200 characters']
+    },
+    
+    // Product Details
+    origin: {
+        type: String,
+        default: 'India'
+    },
+    harvestDate: Date,
+    expiryDate: Date,
+    isOrganic: {
+        type: Boolean,
+        default: false
+    },
+    isSeasonal: {
+        type: Boolean,
+        default: false
+    },
+    
+    // Status
+    isAvailable: {
+        type: Boolean,
+        default: true
+    },
+    isFeatured: {
+        type: Boolean,
+        default: false
+    },
+    isBestSeller: {
+        type: Boolean,
+        default: false
+    },
+    
+    // Nutritional Info (Optional)
+    nutritionalInfo: {
+        calories: Number,
+        protein: String,
+        fat: String,
+        carbs: String,
+        fiber: String
+    },
+    
+    // Tags for filtering
+    tags: [{
+        type: String,
+        enum: ['organic', 'seasonal', 'exotic', 'local', 'premium', 'combo']
+    }],
+    
+    // SEO
+    metaTitle: String,
+    metaDescription: String,
+    metaKeywords: [String],
+    
+    // Views/Tracking
+    viewCount: {
+        type: Number,
+        default: 0
+    },
+    soldCount: {
+        type: Number,
+        default: 0
+    },
+    
+    // Ratings
+    ratings: [{
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        rating: { type: Number, min: 1, max: 5 },
+        review: String,
+        createdAt: { type: Date, default: Date.now }
+    }],
+    averageRating: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 5
+    },
+    totalReviews: {
+        type: Number,
+        default: 0
+    }
+
+}, {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+});
+
+// ============================================
+// MIDDLEWARE
+// ============================================
+
+// Generate slug before saving
+productSchema.pre('save', function(next) {
+    if (!this.slug || this.isModified('name')) {
+        this.slug = slugify(this.name, {
+            lower: true,
+            strict: true,
+            remove: /[*+~.()'"!:@]/g
+        });
+    }
+    next();
+});
+
+// Calculate discount percentage before saving
+productSchema.pre('save', function(next) {
+    if (this.isModified('price') || this.isModified('memberPrice')) {
+        this.discountPercentage = Math.round(((this.price - this.memberPrice) / this.price) * 100);
+    }
+    next();
+});
+
+// Set cover image as first image
+productSchema.pre('save', function(next) {
+    if (this.images && this.images.length > 0) {
+        this.coverImage = this.images[0];
+    }
+    next();
+});
+
+// ============================================
+// VIRTUALS
+// ============================================
+
+// Check if product is in stock
+productSchema.virtual('inStock').get(function() {
+    return this.stock > 0;
+});
+
+// Get stock status text
+productSchema.virtual('stockStatus').get(function() {
+    if (this.stock <= 0) return 'Out of Stock';
+    if (this.stock <= 5) return 'Low Stock';
+    if (this.stock <= 20) return 'Limited Stock';
+    return 'In Stock';
+});
+
+// Get stock status color
+productSchema.virtual('stockStatusColor').get(function() {
+    if (this.stock <= 0) return '#ef4444'; // Red
+    if (this.stock <= 5) return '#f59e0b'; // Orange
+    if (this.stock <= 20) return '#3b82f6'; // Blue
+    return '#10b981'; // Green
+});
+
+// Calculate savings
+productSchema.virtual('savings').get(function() {
+    return this.price - this.memberPrice;
+});
+
+// Savings percentage
+productSchema.virtual('savingsPercentage').get(function() {
+    return Math.round((this.savings / this.price) * 100);
+});
+
+// ============================================
+// INSTANCE METHODS
+// ============================================
+
+// Reduce stock
+productSchema.methods.reduceStock = async function(quantity) {
+    if (this.stock < quantity) {
+        throw new Error(`Insufficient stock for ${this.name}`);
+    }
+    this.stock -= quantity;
+    this.soldCount += quantity;
+    return this.save();
+};
+
+// Increase stock
+productSchema.methods.increaseStock = async function(quantity) {
+    this.stock += quantity;
+    return this.save();
+};
+
+// Add rating
+productSchema.methods.addRating = async function(userId, rating, review = '') {
+    // Remove existing rating from same user
+    this.ratings = this.ratings.filter(r => r.user.toString() !== userId.toString());
+    
+    // Add new rating
+    this.ratings.push({
+        user: userId,
+        rating,
+        review,
+        createdAt: new Date()
+    });
+    
+    // Recalculate average
+    const total = this.ratings.reduce((sum, r) => sum + r.rating, 0);
+    this.averageRating = total / this.ratings.length;
+    this.totalReviews = this.ratings.length;
+    
+    return this.save();
+};
+
+// Increment view count
+productSchema.methods.incrementViews = async function() {
+    this.viewCount += 1;
+    return this.save({ validateBeforeSave: false });
+};
+
+// ============================================
+// STATIC METHODS
+// ============================================
+
+// Get featured products
+productSchema.statics.getFeatured = function(limit = 8) {
+    return this.find({ 
+        isFeatured: true, 
+        isAvailable: true,
+        stock: { $gt: 0 }
+    })
+    .limit(limit)
+    .sort({ createdAt: -1 });
+};
+
+// Get best sellers
+productSchema.statics.getBestSellers = function(limit = 8) {
+    return this.find({ 
+        isBestSeller: true,
+        isAvailable: true 
+    })
+    .limit(limit)
+    .sort({ soldCount: -1 });
+};
+
+// Get products by category
+productSchema.statics.getByCategory = function(category, limit = 20) {
+    return this.find({ 
+        category, 
+        isAvailable: true,
+        stock: { $gt: 0 }
+    })
+    .limit(limit)
+    .sort({ createdAt: -1 });
+};
+
+// Search products
+productSchema.statics.search = function(query, limit = 20) {
+    return this.find({
+        $and: [
+            { isAvailable: true, stock: { $gt: 0 } },
+            {
+                $or: [
+                    { name: { $regex: query, $options: 'i' } },
+                    { description: { $regex: query, $options: 'i' } },
+                    { tags: { $in: [new RegExp(query, 'i')] } }
+                ]
+            }
+        ]
+    }).limit(limit);
+};
+
+// Get low stock products
+productSchema.statics.getLowStock = function(threshold = 5) {
+    return this.find({
+        stock: { $lte: threshold, $gt: 0 },
+        isAvailable: true
+    }).sort({ stock: 1 });
+};
+
+// Get category-wise product count
+productSchema.statics.getCategoryCounts = async function() {
+    return this.aggregate([
+        { $match: { isAvailable: true } },
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+        { $sort: { _id: 1 } }
+    ]);
+};
+
+// ============================================
+// INDEXES
+// ============================================
+
+productSchema.index({ slug: 1 });
+productSchema.index({ category: 1 });
+productSchema.index({ isAvailable: 1, stock: 1 });
+productSchema.index({ isFeatured: 1, createdAt: -1 });
+productSchema.index({ price: 1, memberPrice: 1 });
+productSchema.index({ name: 'text', description: 'text', tags: 'text' });
+
+// ============================================
+// EXPORT
+// ============================================
+
+module.exports = mongoose.model('Product', productSchema);
