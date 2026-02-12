@@ -1,0 +1,276 @@
+const nodemailer = require('nodemailer');
+
+/**
+ * Email Configuration for SJ Mart Retails
+ * Nodemailer + SMTP (Gmail)
+ */
+
+// Create transporter
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: process.env.SMTP_PORT || 587,
+    secure: false, // true for 465, false for 587
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    },
+    tls: {
+        rejectUnauthorized: false // Only for development
+    }
+});
+
+/**
+ * Verify transporter connection
+ */
+const verifyConnection = async () => {
+    try {
+        await transporter.verify();
+        console.log('✅ Email service ready');
+        return true;
+    } catch (error) {
+        console.error('❌ Email service failed:', error);
+        return false;
+    }
+};
+
+/**
+ * Send Email
+ * @param {string} to - Recipient email
+ * @param {string} subject - Email subject
+ * @param {string} html - HTML content
+ * @param {string} text - Plain text content (optional)
+ */
+const sendEmail = async ({ to, subject, html, text = '' }) => {
+    try {
+        const mailOptions = {
+            from: `"SJ Mart Retails" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
+            to,
+            subject: `SJ Mart - ${subject}`,
+            html,
+            text
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`✅ Email sent: ${info.messageId}`);
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        console.error('❌ Email send failed:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Welcome Email Template
+ */
+const sendWelcomeEmail = async (user) => {
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #ff7a00; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                <h1 style="color: white; margin: 0;">SJ Mart Retails</h1>
+                <p style="color: white; margin: 5px 0 0;">Home-Grade Freshness</p>
+            </div>
+            <div style="background: white; padding: 30px; border: 1px solid #eee; border-radius: 0 0 10px 10px;">
+                <h2 style="color: #333;">Welcome ${user.name}! 🎉</h2>
+                <p style="color: #666; line-height: 1.6;">Thank you for joining SJ Mart Retails. Your account has been created successfully.</p>
+                
+                <div style="background: #fff4e5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h3 style="color: #ff7a00; margin-top: 0;">Your Membership Benefits:</h3>
+                    <ul style="color: #666;">
+                        <li>✅ Exclusive member pricing</li>
+                        <li>✅ Price lock-in for 1 year</li>
+                        <li>✅ Priority delivery slots</li>
+                        <li>✅ Free delivery on orders above ₹499</li>
+                    </ul>
+                </div>
+                
+                <a href="${process.env.BASE_URL}/shop" 
+                   style="display: inline-block; background: #ff7a00; color: white; padding: 12px 30px; 
+                          text-decoration: none; border-radius: 25px; font-weight: bold; margin-top: 20px;">
+                    Start Shopping →
+                </a>
+                
+                <p style="color: #999; font-size: 12px; margin-top: 30px; text-align: center;">
+                    SJ Mart Retails - Freshness delivered to your door
+                </p>
+            </div>
+        </div>
+    `;
+
+    return await sendEmail({
+        to: user.email,
+        subject: 'Welcome to SJ Mart Retails! 🥬',
+        html
+    });
+};
+
+/**
+ * Order Confirmation Email Template
+ */
+const sendOrderConfirmation = async (order, user) => {
+    const itemsHtml = order.items.map(item => `
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.name}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">₹${item.price}</td>
+        </tr>
+    `).join('');
+
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #ff7a00; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                <h2 style="color: white; margin: 0;">Order Confirmed! ✅</h2>
+            </div>
+            <div style="background: white; padding: 30px; border: 1px solid #eee; border-radius: 0 0 10px 10px;">
+                <p style="color: #666;">Hi ${user.name},</p>
+                <p style="color: #666;">Your order has been confirmed successfully.</p>
+                
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 5px 0;"><strong>Order ID:</strong> #${order.orderId}</p>
+                    <p style="margin: 5px 0;"><strong>Order Date:</strong> ${new Date(order.createdAt).toLocaleDateString()}</p>
+                    <p style="margin: 5px 0;"><strong>Delivery Date:</strong> ${new Date(order.deliveryDate).toLocaleDateString()}</p>
+                    <p style="margin: 5px 0;"><strong>Payment Method:</strong> ${order.paymentMethod === 'razorpay' ? 'Online' : 'Cash on Delivery'}</p>
+                </div>
+                
+                <h3 style="color: #333;">Order Summary</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 10px; text-align: left;">Item</th>
+                            <th style="padding: 10px; text-align: center;">Qty</th>
+                            <th style="padding: 10px; text-align: right;">Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itemsHtml}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2" style="padding: 10px; text-align: right;"><strong>Total:</strong></td>
+                            <td style="padding: 10px; text-align: right;"><strong>₹${order.finalAmount}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                
+                <a href="${process.env.BASE_URL}/orders/${order._id}" 
+                   style="display: inline-block; background: #ff7a00; color: white; padding: 12px 30px; 
+                          text-decoration: none; border-radius: 25px; font-weight: bold; margin-top: 20px;">
+                    Track Order →
+                </a>
+            </div>
+        </div>
+    `;
+
+    return await sendEmail({
+        to: user.email,
+        subject: `Order Confirmed #${order.orderId}`,
+        html
+    });
+};
+
+/**
+ * Membership Activation Email
+ */
+const sendMembershipActivation = async (user) => {
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #ff7a00; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                <h2 style="color: white; margin: 0;">🎉 Membership Activated!</h2>
+            </div>
+            <div style="background: white; padding: 30px; border: 1px solid #eee; border-radius: 0 0 10px 10px;">
+                <h2 style="color: #333;">Congratulations ${user.name}!</h2>
+                <p style="color: #666;">You are now a premium member of SJ Mart Retails.</p>
+                
+                <div style="background: #fff4e5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 5px 0;"><strong>Membership ID:</strong> ${user.membershipId}</p>
+                    <p style="margin: 5px 0;"><strong>Valid Until:</strong> ${new Date(user.membershipExpiry).toLocaleDateString()}</p>
+                </div>
+                
+                <p style="color: #666;">Start saving on every order with exclusive member prices!</p>
+                
+                <a href="${process.env.BASE_URL}/shop" 
+                   style="display: inline-block; background: #ff7a00; color: white; padding: 12px 30px; 
+                          text-decoration: none; border-radius: 25px; font-weight: bold; margin-top: 20px;">
+                    Shop Member Prices →
+                </a>
+            </div>
+        </div>
+    `;
+
+    return await sendEmail({
+        to: user.email,
+        subject: 'Your SJ Mart Membership is Active! 🎊',
+        html
+    });
+};
+
+/**
+ * Weekly Reminder Email
+ */
+const sendWeeklyReminder = async (user) => {
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #ff7a00; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                <h3 style="color: white; margin: 0;">Time to Plan Your Weekly Supply! 📅</h3>
+            </div>
+            <div style="background: white; padding: 30px; border: 1px solid #eee; border-radius: 0 0 10px 10px;">
+                <p style="color: #666;">Hi ${user.name},</p>
+                <p style="color: #666;">Don't forget to place your weekly order. Lock in your member prices now!</p>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <a href="${process.env.BASE_URL}/shop" 
+                       style="flex: 1; background: #ff7a00; color: white; padding: 12px; text-align: center; 
+                              text-decoration: none; border-radius: 25px; font-weight: bold;">
+                        Shop Now
+                    </a>
+                </div>
+            </div>
+        </div>
+    `;
+
+    return await sendEmail({
+        to: user.email,
+        subject: 'Plan Your Fresh Supply 🥬',
+        html
+    });
+};
+
+/**
+ * Delivery Reminder Email
+ */
+const sendDeliveryReminder = async (order, user) => {
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #ff7a00; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                <h3 style="color: white; margin: 0;">🚚 Your Order is Out for Delivery!</h3>
+            </div>
+            <div style="background: white; padding: 30px; border: 1px solid #eee; border-radius: 0 0 10px 10px;">
+                <p style="color: #666;">Hi ${user.name},</p>
+                <p style="color: #666;">Your order #${order.orderId} will be delivered today.</p>
+                
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 5px 0;"><strong>Delivery Slot:</strong> ${order.deliverySlot}</p>
+                    <p style="margin: 5px 0;"><strong>Address:</strong> ${order.shippingAddress?.street}, ${order.shippingAddress?.city}</p>
+                </div>
+                
+                <p style="color: #666;">Please keep your phone nearby. Our delivery partner will contact you.</p>
+            </div>
+        </div>
+    `;
+
+    return await sendEmail({
+        to: user.email,
+        subject: `Your Order is Out for Delivery 🚚`,
+        html
+    });
+};
+
+module.exports = {
+    transporter,
+    verifyConnection,
+    sendEmail,
+    sendWelcomeEmail,
+    sendOrderConfirmation,
+    sendMembershipActivation,
+    sendWeeklyReminder,
+    sendDeliveryReminder
+};
