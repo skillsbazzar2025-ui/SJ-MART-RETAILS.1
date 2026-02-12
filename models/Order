@@ -1,0 +1,492 @@
+const mongoose = require('mongoose');
+
+const orderSchema = new mongoose.Schema({
+    // Order Identification
+    orderId: {
+        type: String,
+        unique: true,
+        required: true
+    },
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: [true, 'User is required']
+    },
+    
+    // Order Items
+    items: [{
+        product: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Product',
+            required: true
+        },
+        name: {
+            type: String,
+            required: true
+        },
+        price: {
+            type: Number,
+            required: true,
+            min: 0
+        },
+        memberPrice: {
+            type: Number,
+            required: true,
+            min: 0
+        },
+        quantity: {
+            type: Number,
+            required: true,
+            min: 1,
+            max: 100
+        },
+        unit: {
+            type: String,
+            required: true
+        },
+        totalPrice: {
+            type: Number,
+            required: true,
+            min: 0
+        }
+    }],
+    
+    // Pricing Summary
+    subtotal: {
+        type: Number,
+        required: true,
+        min: 0
+    },
+    discountAmount: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    deliveryCharge: {
+        type: Number,
+        default: 40,
+        min: 0
+    },
+    totalAmount: {
+        type: Number,
+        required: true,
+        min: 0
+    },
+    
+    // Payment Details
+    paymentMethod: {
+        type: String,
+        enum: ['razorpay', 'cod'],
+        required: true
+    },
+    paymentStatus: {
+        type: String,
+        enum: ['pending', 'paid', 'failed', 'refunded', 'partially_refunded'],
+        default: 'pending'
+    },
+    razorpayOrderId: String,
+    razorpayPaymentId: String,
+    razorpaySignature: String,
+    paidAt: Date,
+    
+    // Order Status
+    orderStatus: {
+        type: String,
+        enum: [
+            'pending',
+            'confirmed',
+            'processing',
+            'packed',
+            'shipped',
+            'out_for_delivery',
+            'delivered',
+            'cancelled',
+            'returned',
+            'refunded'
+        ],
+        default: 'pending'
+    },
+    
+    // Delivery Details
+    deliveryDate: {
+        type: Date,
+        required: true
+    },
+    deliverySlot: {
+        type: String,
+        enum: ['morning', 'afternoon', 'evening'],
+        required: true
+    },
+    deliveryAddress: {
+        street: { type: String, required: true },
+        area: String,
+        city: { type: String, required: true },
+        state: { type: String, required: true },
+        pincode: { type: String, required: true },
+        landmark: String,
+        phone: { type: String, required: true }
+    },
+    
+    // Membership Info
+    isMemberOrder: {
+        type: Boolean,
+        default: false
+    },
+    membershipId: String,
+    memberDiscount: {
+        type: Number,
+        default: 0
+    },
+    
+    // Tracking
+    trackingId: String,
+    trackingUrl: String,
+    deliveryPartner: String,
+    
+    // Status History
+    statusHistory: [{
+        status: {
+            type: String,
+            enum: [
+                'pending', 'confirmed', 'processing', 'packed',
+                'shipped', 'out_for_delivery', 'delivered',
+                'cancelled', 'returned', 'refunded'
+            ]
+        },
+        note: String,
+        updatedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        timestamp: {
+            type: Date,
+            default: Date.now
+        }
+    }],
+    
+    // Customer Notes
+    customerNotes: String,
+    adminNotes: String,
+    
+    // Cancellation
+    cancelledAt: Date,
+    cancellationReason: String,
+    cancelledBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    
+    // Return/Refund
+    returnedAt: Date,
+    returnReason: String,
+    refundAmount: Number,
+    refundId: String,
+    refundedAt: Date,
+    
+    // Invoice
+    invoiceUrl: String,
+    invoiceGeneratedAt: Date
+
+}, {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+});
+
+// ============================================
+// MIDDLEWARE
+// ============================================
+
+// Generate unique order ID before saving
+orderSchema.pre('save', async function(next) {
+    if (!this.orderId) {
+        const date = new Date();
+        const year = date.getFullYear().toString().slice(-2);
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        const timestamp = Date.now().toString().slice(-6);
+        
+        this.orderId = `ORD${year}${month}${day}${timestamp}${random}`;
+    }
+    next();
+});
+
+// Add initial status to history
+orderSchema.pre('save', function(next) {
+    if (this.isNew) {
+        this.statusHistory.push({
+            status: this.orderStatus,
+            note: 'Order created',
+            timestamp: new Date()
+        });
+    }
+    next();
+});
+
+// Calculate total amount before saving
+orderSchema.pre('save', function(next) {
+    // Calculate item totals
+    this.items.forEach(item => {
+        item.totalPrice = (item.memberPrice || item.price) * item.quantity;
+    });
+    
+    // Calculate subtotal
+    this.subtotal = this.items.reduce((sum, item) => sum + item.totalPrice, 0);
+    
+    // Calculate total amount
+    this.totalAmount = this.subtotal - this.discountAmount + this.deliveryCharge;
+    
+    next();
+});
+
+// ============================================
+// VIRTUALS
+// ============================================
+
+// Get item count
+orderSchema.virtual('itemCount').get(function() {
+    return this.items.reduce((count, item) => count + item.quantity, 0);
+});
+
+// Get unique items count
+orderSchema.virtual('uniqueItemCount').get(function() {
+    return this.items.length;
+});
+
+// Check if order is deliverable
+orderSchema.virtual('isDeliverable').get(function() {
+    const today = new Date();
+    return this.deliveryDate >= today && 
+           ['confirmed', 'processing', 'packed', 'shipped', 'out_for_delivery'].includes(this.orderStatus);
+});
+
+// Check if order can be cancelled
+orderSchema.virtual('canCancel').get(function() {
+    return ['pending', 'confirmed', 'processing'].includes(this.orderStatus);
+});
+
+// Check if order is paid
+orderSchema.virtual('isPaid').get(function() {
+    return this.paymentStatus === 'paid';
+});
+
+// Get savings from member pricing
+orderSchema.virtual('memberSavings').get(function() {
+    let regularTotal = 0;
+    let memberTotal = 0;
+    
+    this.items.forEach(item => {
+        regularTotal += item.price * item.quantity;
+        memberTotal += item.memberPrice * item.quantity;
+    });
+    
+    return regularTotal - memberTotal;
+});
+
+// ============================================
+// INSTANCE METHODS
+// ============================================
+
+// Update order status
+orderSchema.methods.updateStatus = async function(status, note = '', userId = null) {
+    const oldStatus = this.orderStatus;
+    this.orderStatus = status;
+    
+    // Add to history
+    this.statusHistory.push({
+        status,
+        note: note || `Status updated from ${oldStatus} to ${status}`,
+        updatedBy: userId,
+        timestamp: new Date()
+    });
+    
+    // Set timestamps based on status
+    if (status === 'delivered') {
+        this.deliveredAt = new Date();
+    } else if (status === 'cancelled') {
+        this.cancelledAt = new Date();
+    } else if (status === 'confirmed') {
+        this.confirmedAt = new Date();
+    }
+    
+    return this.save();
+};
+
+// Mark as paid
+orderSchema.methods.markAsPaid = async function(paymentId, signature = null) {
+    this.paymentStatus = 'paid';
+    this.razorpayPaymentId = paymentId;
+    this.razorpaySignature = signature;
+    this.paidAt = new Date();
+    
+    // Update status if pending
+    if (this.orderStatus === 'pending') {
+        this.orderStatus = 'confirmed';
+        this.statusHistory.push({
+            status: 'confirmed',
+            note: 'Payment received, order confirmed',
+            timestamp: new Date()
+        });
+    }
+    
+    return this.save();
+};
+
+// Cancel order
+orderSchema.methods.cancelOrder = async function(reason, userId = null) {
+    if (!this.canCancel) {
+        throw new Error('Order cannot be cancelled at this stage');
+    }
+    
+    this.orderStatus = 'cancelled';
+    this.cancelledAt = new Date();
+    this.cancellationReason = reason;
+    this.cancelledBy = userId;
+    
+    // If payment was made, mark for refund
+    if (this.paymentStatus === 'paid') {
+        this.paymentStatus = 'refunded';
+    }
+    
+    this.statusHistory.push({
+        status: 'cancelled',
+        note: reason,
+        updatedBy: userId,
+        timestamp: new Date()
+    });
+    
+    return this.save();
+};
+
+// Generate invoice
+orderSchema.methods.generateInvoice = async function() {
+    // Generate invoice URL (implement based on your invoice service)
+    const invoiceId = `INV${this.orderId.slice(3)}`;
+    this.invoiceUrl = `/invoices/${invoiceId}.pdf`;
+    this.invoiceGeneratedAt = new Date();
+    
+    return this.save();
+};
+
+// ============================================
+// STATIC METHODS
+// ============================================
+
+// Get orders by user
+orderSchema.statics.getUserOrders = function(userId, limit = 20) {
+    return this.find({ user: userId })
+        .populate('items.product', 'name images')
+        .sort({ createdAt: -1 })
+        .limit(limit);
+};
+
+// Get today's orders
+orderSchema.statics.getTodaysOrders = function() {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    
+    return this.find({
+        createdAt: { $gte: start, $lte: end }
+    })
+    .populate('user', 'name email phone')
+    .sort({ createdAt: -1 });
+};
+
+// Get pending deliveries
+orderSchema.statics.getPendingDeliveries = function() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    return this.find({
+        deliveryDate: { $gte: today, $lt: tomorrow },
+        orderStatus: { $in: ['confirmed', 'processing', 'packed', 'shipped'] }
+    })
+    .populate('user', 'name email phone address');
+};
+
+// Get revenue statistics
+orderSchema.statics.getRevenueStats = async function(period = 'day') {
+    const groupBy = {
+        day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        month: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+        year: { $dateToString: { format: '%Y', date: '$createdAt' } }
+    };
+    
+    return this.aggregate([
+        { $match: { paymentStatus: 'paid', orderStatus: { $ne: 'cancelled' } } },
+        { $group: {
+            _id: groupBy[period],
+            totalOrders: { $sum: 1 },
+            totalRevenue: { $sum: '$totalAmount' },
+            totalDiscount: { $sum: '$discountAmount' },
+            avgOrderValue: { $avg: '$totalAmount' }
+        }},
+        { $sort: { _id: -1 } }
+    ]);
+};
+
+// Get order statistics
+orderSchema.statics.getOrderStats = async function() {
+    const total = await this.countDocuments();
+    const pending = await this.countDocuments({ orderStatus: 'pending' });
+    const confirmed = await this.countDocuments({ orderStatus: 'confirmed' });
+    const processing = await this.countDocuments({ orderStatus: 'processing' });
+    const delivered = await this.countDocuments({ orderStatus: 'delivered' });
+    const cancelled = await this.countDocuments({ orderStatus: 'cancelled' });
+    const paid = await this.countDocuments({ paymentStatus: 'paid' });
+    const cod = await this.countDocuments({ paymentMethod: 'cod' });
+    
+    return {
+        total,
+        pending,
+        confirmed,
+        processing,
+        delivered,
+        cancelled,
+        paid,
+        cod,
+        completed: delivered,
+        successRate: total ? ((delivered / total) * 100).toFixed(2) : 0
+    };
+};
+
+// Get daily orders for delivery planning
+orderSchema.statics.getDeliveryPlan = function(date) {
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+    
+    return this.find({
+        deliveryDate: { $gte: start, $lte: end },
+        orderStatus: { $nin: ['cancelled', 'delivered'] }
+    })
+    .populate('user', 'name phone address')
+    .sort({ deliverySlot: 1 });
+};
+
+// ============================================
+// INDEXES
+// ============================================
+
+orderSchema.index({ orderId: 1 });
+orderSchema.index({ user: 1, createdAt: -1 });
+orderSchema.index({ orderStatus: 1, createdAt: -1 });
+orderSchema.index({ deliveryDate: 1, deliverySlot: 1 });
+orderSchema.index({ paymentStatus: 1, paymentMethod: 1 });
+orderSchema.index({ razorpayOrderId: 1 });
+orderSchema.index({ createdAt: -1 });
+
+// ============================================
+// EXPORT
+// ============================================
+
+module.exports = mongoose.model('Order', orderSchema);
