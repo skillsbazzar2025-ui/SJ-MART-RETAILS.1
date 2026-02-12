@@ -1,0 +1,68 @@
+const express = require('express');
+const router = express.Router();
+const Product = require('../models/Product');
+const Category = require('../models/Category');
+
+// @desc    Home page
+// @route   GET /
+router.get('/', async (req, res) => {
+    try {
+        const featuredProducts = await Product.getFeatured(8);
+        const bestSellers = await Product.getBestSellers(4);
+        const categories = [
+            { name: 'Fresh Vegetables', slug: 'fresh-vegetables', icon: 'carrot', count: 0 },
+            { name: 'Fresh Fruits', slug: 'fresh-fruits', icon: 'apple-alt', count: 0 },
+            { name: 'Diced Vegetables', slug: 'diced-vegetables', icon: 'cube', count: 0 },
+            { name: 'Diced Fruits', slug: 'diced-fruits', icon: 'lemon', count: 0 },
+            { name: 'Fresh Salad', slug: 'fresh-salad', icon: 'salad', count: 0 }
+        ];
+
+        res.render('home', {
+            title: 'Home',
+            featuredProducts,
+            bestSellers,
+            categories,
+            currentUser: req.session.user || null,
+            cartCount: req.session.cartCount || 0
+        });
+
+    } catch (error) {
+        console.error('Home page error:', error);
+        res.status(500).render('error', {
+            title: 'Error',
+            message: 'Something went wrong!'
+        });
+    }
+});
+
+// @desc    About page
+// @route   GET /about
+router.get('/about', (req, res) => {
+    res.render('about', {
+        title: 'About Us',
+        currentUser: req.session.user || null,
+        cartCount: req.session.cartCount || 0
+    });
+});
+
+// @desc    Contact page
+// @route   GET /contact
+router.get('/contact', (req, res) => {
+    res.render('contact', {
+        title: 'Contact Us',
+        currentUser: req.session.user || null,
+        cartCount: req.session.cartCount || 0
+    });
+});
+
+// @desc    Membership page
+// @route   GET /membership
+router.get('/membership', (req, res) => {
+    res.render('membership', {
+        title: 'Membership',
+        currentUser: req.session.user || null,
+        cartCount: req.session.cartCount || 0
+    });
+});
+
+module.exports = router;
