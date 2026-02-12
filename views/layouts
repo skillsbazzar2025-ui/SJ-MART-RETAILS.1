@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- SEO Meta Tags -->
+    <title><%= title ? title + ' - SJ Mart' : 'SJ Mart - Fresh Vegetables & Fruits' %></title>
+    <meta name="description" content="SJ Mart Retails - Home-Grade Freshness. Planned Supply. Trusted Quality. Premium fresh vegetables and fruits with membership benefits.">
+    <meta name="keywords" content="fresh vegetables, fresh fruits, organic, diced vegetables, salad, grocery delivery, membership">
+    <meta name="author" content="SJ Mart Retails">
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:title" content="SJ Mart Retails - Fresh Vegetables & Fruits">
+    <meta property="og:description" content="Home-Grade Freshness. Planned Supply. Trusted Quality.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="<%= BASE_URL || 'https://sjmart.com' %>">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+    <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+    
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/css/style.css">
+    
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="<%= csrfToken %>">
+    
+    <!-- Razorpay SDK -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+    <!-- Navbar Partial -->
+    <%- include('../partials/navbar') %>
+    
+    <!-- Main Content -->
+    <main class="main-content">
+        <%- body %>
+    </main>
+    
+    <!-- Footer Partial -->
+    <%- include('../partials/footer') %>
+    
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+    
+    <!-- JavaScript -->
+    <script src="/js/main.js"></script>
+    <script src="/js/cart.js"></script>
+    
+    <!-- Page Specific Scripts -->
+    <% if (typeof scripts !== 'undefined') { %>
+        <%- scripts %>
+    <% } %>
+    
+    <!-- Analytics (Production Only) -->
+    <% if (process.env.NODE_ENV === 'production') { %>
+        <!-- Google Analytics -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=UA-XXXXX-X"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'UA-XXXXX-X');
+        </script>
+    <% } %>
+</body>
+</html>
