@@ -1,0 +1,536 @@
+/* ============================================
+   SJ MART RETAILS - MAIN JAVASCRIPT
+   ============================================ */
+
+// Wait for DOM to load
+document.addEventListener('DOMContentLoaded', function() {
+    initNavigation();
+    initSearch();
+    initFlashMessages();
+    initQuantityButtons();
+    initViewToggle();
+    initSmoothScroll();
+    initMobileMenu();
+});
+
+/* --------------------------------------------
+   Navigation & Mobile Menu
+   -------------------------------------------- */
+function initNavigation() {
+    // Mobile menu toggle
+    const menuToggle = document.getElementById('menuToggle');
+    const navLinks = document.querySelector('.nav-links');
+    
+    if (menuToggle && navLinks) {
+        menuToggle.addEventListener('click', function() {
+            navLinks.classList.toggle('active');
+            this.classList.toggle('active');
+        });
+    }
+    
+    // Active link highlighting
+    const currentPath = window.location.pathname;
+    document.querySelectorAll('.nav-links a').forEach(link => {
+        if (link.getAttribute('href') === currentPath) {
+            link.classList.add('active');
+        }
+    });
+}
+
+function initMobileMenu() {
+    const navbar = document.querySelector('.navbar');
+    let lastScroll = 0;
+    
+    window.addEventListener('scroll', () => {
+        const currentScroll = window.pageYOffset;
+        
+        if (currentScroll > lastScroll && currentScroll > 100) {
+            navbar.style.transform = 'translateY(-100%)';
+        } else {
+            navbar.style.transform = 'translateY(0)';
+        }
+        lastScroll = currentScroll;
+    });
+}
+
+/* --------------------------------------------
+   Search Functionality
+   -------------------------------------------- */
+function initSearch() {
+    const searchToggle = document.getElementById('searchToggle');
+    const searchBar = document.getElementById('searchBar');
+    const closeSearch = document.getElementById('closeSearch');
+    const searchInput = document.querySelector('.search-container input');
+    
+    if (searchToggle && searchBar) {
+        searchToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            searchBar.classList.toggle('active');
+            if (searchBar.classList.contains('active') && searchInput) {
+                searchInput.focus();
+            }
+        });
+    }
+    
+    if (closeSearch && searchBar) {
+        closeSearch.addEventListener('click', function() {
+            searchBar.classList.remove('active');
+        });
+    }
+    
+    // Close search on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && searchBar?.classList.contains('active')) {
+            searchBar.classList.remove('active');
+        }
+    });
+    
+    // Search suggestions (demo)
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(function(e) {
+            const query = e.target.value;
+            if (query.length > 2) {
+                fetchSearchSuggestions(query);
+            }
+        }, 300));
+    }
+}
+
+function fetchSearchSuggestions(query) {
+    // API call for search suggestions
+    fetch(`/api/search/suggestions?q=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            // Render suggestions
+            console.log('Suggestions:', data);
+        })
+        .catch(error => console.error('Search error:', error));
+}
+
+/* --------------------------------------------
+   Flash Messages
+   -------------------------------------------- */
+function initFlashMessages() {
+    const flashMessages = document.querySelectorAll('.flash-message');
+    
+    flashMessages.forEach(message => {
+        // Auto dismiss after 5 seconds
+        setTimeout(() => {
+            dismissFlashMessage(message);
+        }, 5000);
+        
+        // Manual dismiss
+        const closeBtn = message.querySelector('.flash-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                dismissFlashMessage(message);
+            });
+        }
+    });
+}
+
+function dismissFlashMessage(message) {
+    message.style.animation = 'slideOut 0.3s ease forwards';
+    setTimeout(() => {
+        message.remove();
+    }, 300);
+}
+
+/* --------------------------------------------
+   Quantity Buttons
+   -------------------------------------------- */
+function initQuantityButtons() {
+    document.querySelectorAll('.quantity-selector').forEach(selector => {
+        const input = selector.querySelector('input[type="number"]');
+        const minusBtn = selector.querySelector('.qty-btn.minus');
+        const plusBtn = selector.querySelector('.qty-btn.plus');
+        
+        if (minusBtn && input) {
+            minusBtn.addEventListener('click', () => {
+                let value = parseInt(input.value);
+                if (value > 1) {
+                    input.value = value - 1;
+                    triggerEvent(input, 'change');
+                }
+            });
+        }
+        
+        if (plusBtn && input) {
+            plusBtn.addEventListener('click', () => {
+                let value = parseInt(input.value);
+                let max = parseInt(input.max) || 99;
+                if (value < max) {
+                    input.value = value + 1;
+                    triggerEvent(input, 'change');
+                }
+            });
+        }
+        
+        if (input) {
+            input.addEventListener('change', function() {
+                let value = parseInt(this.value);
+                let min = parseInt(this.min) || 1;
+                let max = parseInt(this.max) || 99;
+                
+                if (isNaN(value) || value < min) {
+                    this.value = min;
+                } else if (value > max) {
+                    this.value = max;
+                }
+            });
+        }
+    });
+}
+
+/* --------------------------------------------
+   View Toggle (Grid/List)
+   -------------------------------------------- */
+function initViewToggle() {
+    const viewBtns = document.querySelectorAll('.view-btn');
+    const productsGrid = document.getElementById('productsGrid');
+    
+    if (viewBtns.length && productsGrid) {
+        viewBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const view = this.dataset.view;
+                
+                viewBtns.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                if (view === 'list') {
+                    productsGrid.classList.add('list-view');
+                } else {
+                    productsGrid.classList.remove('list-view');
+                }
+                
+                // Save preference to localStorage
+                localStorage.setItem('productView', view);
+            });
+        });
+        
+        // Load saved preference
+        const savedView = localStorage.getItem('productView');
+        if (savedView === 'list') {
+            document.querySelector('[data-view="list"]')?.click();
+        }
+    }
+}
+
+/* --------------------------------------------
+   Smooth Scroll
+   -------------------------------------------- */
+function initSmoothScroll() {
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function(e) {
+            const href = this.getAttribute('href');
+            
+            if (href !== '#') {
+                e.preventDefault();
+                const target = document.querySelector(href);
+                
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            }
+        });
+    });
+}
+
+/* --------------------------------------------
+   Toast Notifications
+   -------------------------------------------- */
+function showToast(message, type = 'success', duration = 3000) {
+    const toastContainer = document.getElementById('toast-container');
+    
+    if (!toastContainer) {
+        const container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    
+    let icon = '';
+    switch(type) {
+        case 'success':
+            icon = '<i class="fas fa-check-circle"></i>';
+            break;
+        case 'error':
+            icon = '<i class="fas fa-exclamation-circle"></i>';
+            break;
+        case 'warning':
+            icon = '<i class="fas fa-exclamation-triangle"></i>';
+            break;
+        case 'info':
+            icon = '<i class="fas fa-info-circle"></i>';
+            break;
+    }
+    
+    toast.innerHTML = `
+        <div class="toast-content">
+            ${icon}
+            <span>${message}</span>
+        </div>
+        <button class="toast-close">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    document.getElementById('toast-container').appendChild(toast);
+    
+    // Show animation
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    // Auto remove
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+    
+    // Manual close
+    toast.querySelector('.toast-close').addEventListener('click', () => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    });
+}
+
+/* --------------------------------------------
+   AJAX Requests
+   -------------------------------------------- */
+async function fetchAPI(url, options = {}) {
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+        
+        const defaultOptions = {
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        };
+        
+        const response = await fetch(url, { ...defaultOptions, ...options });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('API Error:', error);
+        showToast(error.message || 'Something went wrong', 'error');
+        throw error;
+    }
+}
+
+/* --------------------------------------------
+   Wishlist
+   -------------------------------------------- */
+async function toggleWishlist(productId) {
+    try {
+        const response = await fetchAPI(`/wishlist/toggle/${productId}`, {
+            method: 'POST'
+        });
+        
+        if (response.success) {
+            const icon = event.currentTarget.querySelector('i');
+            
+            if (response.added) {
+                icon.classList.remove('far');
+                icon.classList.add('fas');
+                showToast('Added to wishlist', 'success');
+            } else {
+                icon.classList.remove('fas');
+                icon.classList.add('far');
+                showToast('Removed from wishlist', 'info');
+            }
+        }
+    } catch (error) {
+        console.error('Wishlist error:', error);
+    }
+}
+
+/* --------------------------------------------
+   Quick View
+   -------------------------------------------- */
+async function quickView(productId) {
+    try {
+        const modal = document.createElement('div');
+        modal.className = 'modal quick-view-modal';
+        modal.id = 'quickViewModal';
+        
+        modal.innerHTML = `
+            <div class="modal-overlay"></div>
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3>Quick View</h3>
+                    <button class="modal-close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        Loading...
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        document.body.style.overflow = 'hidden';
+        
+        // Fetch product details
+        const response = await fetchAPI(`/api/products/${productId}/quick-view`);
+        
+        if (response.success) {
+            const modalBody = modal.querySelector('.modal-body');
+            modalBody.innerHTML = renderQuickView(response.product);
+        }
+        
+        // Close modal
+        modal.querySelector('.modal-overlay').addEventListener('click', () => closeModal(modal));
+        modal.querySelector('.modal-close').addEventListener('click', () => closeModal(modal));
+        
+    } catch (error) {
+        console.error('Quick view error:', error);
+        showToast('Failed to load product details', 'error');
+    }
+}
+
+function renderQuickView(product) {
+    return `
+        <div class="quick-view-content">
+            <div class="quick-view-image">
+                <img src="${product.coverImage}" alt="${product.name}">
+            </div>
+            <div class="quick-view-info">
+                <span class="product-category">${product.category}</span>
+                <h4>${product.name}</h4>
+                <div class="product-price">
+                    <span class="member-price">₹${product.memberPrice}</span>
+                    <span class="regular-price">₹${product.price}</span>
+                    <span class="discount">${product.discountPercentage}% off</span>
+                </div>
+                <p class="product-description">${product.shortDescription || ''}</p>
+                <div class="product-meta">
+                    <span class="stock ${product.stock > 0 ? 'in-stock' : 'out-of-stock'}">
+                        <i class="fas fa-${product.stock > 0 ? 'check-circle' : 'times-circle'}"></i>
+                        ${product.stock > 0 ? 'In Stock' : 'Out of Stock'}
+                    </span>
+                    <span class="unit">
+                        <i class="fas fa-weight"></i> ${product.unit}
+                    </span>
+                </div>
+                <button class="btn btn-primary btn-block" onclick="addToCart('${product._id}', 1)">
+                    <i class="fas fa-shopping-cart"></i>
+                    Add to Cart
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function closeModal(modal) {
+    modal.classList.add('closing');
+    setTimeout(() => {
+        modal.remove();
+        document.body.style.overflow = '';
+    }, 300);
+}
+
+/* --------------------------------------------
+   Price Formatting
+   -------------------------------------------- */
+function formatPrice(price) {
+    return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(price);
+}
+
+/* --------------------------------------------
+   Date Formatting
+   -------------------------------------------- */
+function formatDate(date, format = 'DD MMM YYYY') {
+    const d = new Date(date);
+    const options = {
+        'DD MMM YYYY': { day: '2-digit', month: 'short', year: 'numeric' },
+        'DD/MM/YYYY': { day: '2-digit', month: '2-digit', year: 'numeric' },
+        'MMMM DD, YYYY': { month: 'long', day: 'numeric', year: 'numeric' }
+    };
+    
+    return d.toLocaleDateString('en-IN', options[format] || options['DD MMM YYYY']);
+}
+
+/* --------------------------------------------
+   Utility Functions
+   -------------------------------------------- */
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+function throttle(func, limit) {
+    let inThrottle;
+    return function(...args) {
+        if (!inThrottle) {
+            func.apply(this, args);
+            inThrottle = setTimeout(() => inThrottle = false, limit);
+        }
+    };
+}
+
+function triggerEvent(element, eventName) {
+    const event = new Event(eventName, { bubbles: true });
+    element.dispatchEvent(event);
+}
+
+/* --------------------------------------------
+   Lazy Loading Images
+   -------------------------------------------- */
+if ('IntersectionObserver' in window) {
+    const imageObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                const src = img.dataset.src;
+                
+                if (src) {
+                    img.src = src;
+                    img.classList.add('loaded');
+                    observer.unobserve(img);
+                }
+            }
+        });
+    });
+    
+    document.querySelectorAll('img[data-src]').forEach(img => {
+        imageObserver.observe(img);
+    });
+}
+
+/* --------------------------------------------
+   Global Functions (Exposed to Window)
+   -------------------------------------------- */
+window.addToCart = addToCart;
+window.toggleWishlist = toggleWishlist;
+window.quickView = quickView;
+window.showToast = showToast;
+window.formatPrice = formatPrice;
