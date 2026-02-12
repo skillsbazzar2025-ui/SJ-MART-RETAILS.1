@@ -1,0 +1,123 @@
+const User = require('../models/User');
+
+/**
+ * Authentication Middleware
+ * SJ Mart Retails - Production Ready
+ */
+
+// @desc    Protect routes - User must be logged in
+exports.protect = async (req, res, next) => {
+    if (!req.session.user) {
+        // Check for API requests
+        if (req.xhr || req.headers.accept?.includes('json') || req.path.startsWith('/api/')) {
+            return res.status(401).json({
+                success: false,
+                message: 'Please login to continue',
+                redirect: '/auth/login'
+            });
+        }
+        // Check for admin routes
+        if (req.path.startsWith('/admin')) {
+            return res.redirect('/auth/login?redirect=' + encodeURIComponent(req.originalUrl));
+        }
+        return res.redirect('/auth/login');
+    }
+
+    // Verify user still exists in database
+    try {
+        const user = await User.findById(req.session.user.id);
+        if (!user || !user.isActive) {
+            req.session.destroy();
+            return res.redirect('/auth/login');
+        }
+
+        // Update session with latest data
+        req.session.user = {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            isMember: user.isMember,
+            role: user.role,
+            membershipId: user.membershipId,
+            membershipExpiry: user.membershipExpiry
+        };
+
+        res.locals.currentUser = req.session.user;
+        next();
+    } catch (error) {
+        console.error('Auth middleware error:', error);
+        res.status(500).render('error', {
+            title: 'Error',
+            message: 'Authentication failed'
+        });
+    }
+};
+
+// @desc    Admin only routes
+exports.admin = (req, res, next) => {
+    if (!req.session.user || req.session.user.role !== 'admin') {
+        if (req.xhr || req.headers.accept?.includes('json')) {
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied. Admin privileges required.'
+            });
+        }
+        return res.redirect('/');
+    }
+    next();
+};
+
+// @desc    Redirect if already logged in
+exports.redirectIfAuthenticated = (req, res, next) => {
+    if (req.session.user) {
+        return res.redirect('/');
+    }
+    next();
+};
+
+// @desc    Optional auth - doesn't require login but sets user if exists
+exports.optionalAuth = async (req, res, next) => {
+    if (req.session.user) {
+        try {
+            const user = await User.findById(req.session.user.id);
+            if (user && user.isActive) {
+                res.locals.currentUser = {
+                    id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    isMember: user.isMember,
+                    role: user.role
+                };
+            }
+        } catch (error) {
+            console.error('Optional auth error:', error);
+        }
+    }
+    next();
+};
+
+// @desc    Check membership status
+exports.checkMembership = async (req, res, next) => {
+    if (req.session.user && req.session.user.isMember) {
+        const user = await User.findById(req.session.user.id);
+        if (!user.isMembershipActive()) {
+            req.session.user.isMember = false;
+            req.session.user.membershipId = null;
+            await user.save();
+        }
+    }
+    next();
+};
+
+// @desc    API Key authentication for webhooks
+exports.apiKeyAuth = (req, res, next) => {
+    const apiKey = req.headers['x-api-key'];
+    
+    if (!apiKey || apiKey !== process.env.API_KEY) {
+        return res.status(401).json({
+            success: false,
+            message: 'Invalid API key'
+        });
+    }
+    next();
+};
