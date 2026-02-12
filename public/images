@@ -1,0 +1,55 @@
+public/images/
+├── logo/
+│   ├── logo.svg
+│   ├── logo-white.svg
+│   ├── logo-icon.svg
+│   ├── favicon.ico
+│   ├── apple-touch-icon.png
+│   └── og-image.jpg
+├── products/
+│   ├── product-placeholder.jpg
+│   ├── tomatoes.jpg
+│   ├── spinach.jpg
+│   ├── apples.jpg
+│   ├── bananas.jpg
+│   ├── onions.jpg
+│   ├── potatoes.jpg
+│   ├── carrots.jpg
+│   ├── capsicum.jpg
+│   ├── broccoli.jpg
+│   ├── strawberries.jpg
+│   ├── mangoes.jpg
+│   └── salad-mix.jpg
+├── categories/
+│   ├── fresh-vegetables.jpg
+│   ├── diced-vegetables.jpg
+│   ├── fresh-fruits.jpg
+│   ├── diced-fruits.jpg
+│   └── fresh-salad.jpg
+├── banners/
+│   ├── hero-banner.jpg
+│   ├── membership-banner.jpg
+│   ├── app-banner.jpg
+│   └── offer-banner.jpg
+├── icons/
+│   ├── delivery.svg
+│   ├── fresh.svg
+│   ├── member.svg
+│   ├── secure.svg
+│   ├── trust.svg
+│   └── quality.svg
+├── payments/
+│   ├── razorpay.svg
+│   ├── visa.svg
+│   ├── mastercard.svg
+│   ├── upi.svg
+│   └── cod.svg
+├── app/
+│   ├── app-mockup.png
+│   ├── google-play.svg
+│   ├── app-store.svg
+│   └── qr-code.svg
+└── default/
+    ├── avatar.png
+    ├── no-image.jpg
+    └── placeholder.jpg
