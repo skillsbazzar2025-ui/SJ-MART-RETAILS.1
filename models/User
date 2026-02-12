@@ -1,0 +1,238 @@
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const userSchema = new mongoose.Schema({
+    // Basic Information
+    name: {
+        type: String,
+        required: [true, 'Name is required'],
+        trim: true,
+        minlength: [2, 'Name must be at least 2 characters'],
+        maxlength: [50, 'Name cannot exceed 50 characters']
+    },
+    email: {
+        type: String,
+        required: [true, 'Email is required'],
+        unique: true,
+        lowercase: true,
+        trim: true,
+        match: [
+            /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+            'Please enter a valid email'
+        ]
+    },
+    password: {
+        type: String,
+        required: [true, 'Password is required'],
+        minlength: [6, 'Password must be at least 6 characters'],
+        select: false // Don't return password by default
+    },
+    phone: {
+        type: String,
+        required: [true, 'Phone number is required'],
+        match: [/^[6-9]\d{9}$/, 'Please enter a valid 10-digit Indian mobile number']
+    },
+    
+    // Membership Details
+    isMember: {
+        type: Boolean,
+        default: false
+    },
+    membershipId: {
+        type: String,
+        unique: true,
+        sparse: true // Allows multiple null values
+    },
+    membershipActivatedAt: Date,
+    membershipExpiry: Date,
+    membershipDeactivatedAt: Date,
+    
+    // Role
+    role: {
+        type: String,
+        enum: ['user', 'admin'],
+        default: 'user'
+    },
+    
+    // Address
+    address: {
+        street: { type: String, trim: true },
+        area: { type: String, trim: true },
+        city: { type: String, trim: true },
+        state: { type: String, trim: true },
+        pincode: { 
+            type: String, 
+            match: [/^[1-9][0-9]{5}$/, 'Please enter valid 6-digit pincode']
+        },
+        landmark: { type: String, trim: true }
+    },
+    
+    // Orders
+    orders: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Order'
+    }],
+    
+    // Cart
+    cart: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Cart'
+    },
+    
+    // Account Status
+    isActive: {
+        type: Boolean,
+        default: true
+    },
+    lastLogin: Date,
+    loginCount: {
+        type: Number,
+        default: 0
+    }
+    
+}, {
+    timestamps: true // Adds createdAt and updatedAt
+});
+
+// ============================================
+// MIDDLEWARE
+// ============================================
+
+// Hash password before saving
+userSchema.pre('save', async function(next) {
+    // Only hash if password is modified
+    if (!this.isModified('password')) return next();
+    
+    try {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+        next();
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Generate membership ID before saving if membership activated
+userSchema.pre('save', function(next) {
+    if (this.isMember && !this.membershipId) {
+        this.membershipId = this.generateMembershipId();
+        this.membershipActivatedAt = new Date();
+        
+        // Set expiry to 1 year from now
+        const expiryDate = new Date();
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+        this.membershipExpiry = expiryDate;
+    }
+    next();
+});
+
+// ============================================
+// INSTANCE METHODS
+// ============================================
+
+// Compare password
+userSchema.methods.comparePassword = async function(candidatePassword) {
+    try {
+        return await bcrypt.compare(candidatePassword, this.password);
+    } catch (error) {
+        throw error;
+    }
+};
+
+// Generate unique membership ID
+userSchema.methods.generateMembershipId = function() {
+    const prefix = 'SJM';
+    const timestamp = Date.now().toString().slice(-8);
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const year = new Date().getFullYear().toString().slice(-2);
+    return `${prefix}${year}${timestamp}${random}`;
+};
+
+// Check if membership is active
+userSchema.methods.isMembershipActive = function() {
+    if (!this.isMember || !this.membershipExpiry) return false;
+    return this.membershipExpiry > new Date();
+};
+
+// Get membership days remaining
+userSchema.methods.getMembershipDaysRemaining = function() {
+    if (!this.membershipExpiry) return 0;
+    const diffTime = this.membershipExpiry - new Date();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+};
+
+// Update last login
+userSchema.methods.updateLastLogin = async function() {
+    this.lastLogin = new Date();
+    this.loginCount += 1;
+    return this.save({ validateBeforeSave: false });
+};
+
+// ============================================
+// STATIC METHODS
+// ============================================
+
+// Find active members
+userSchema.statics.findActiveMembers = function() {
+    return this.find({
+        isMember: true,
+        membershipExpiry: { $gt: new Date() }
+    });
+};
+
+// Find expired memberships
+userSchema.statics.findExpiredMemberships = function() {
+    return this.find({
+        isMember: true,
+        membershipExpiry: { $lt: new Date() }
+    });
+};
+
+// Get member statistics
+userSchema.statics.getMemberStats = async function() {
+    const total = await this.countDocuments({ isMember: true });
+    const active = await this.countDocuments({
+        isMember: true,
+        membershipExpiry: { $gt: new Date() }
+    });
+    const expired = await this.countDocuments({
+        isMember: true,
+        membershipExpiry: { $lt: new Date() }
+    });
+    
+    return { total, active, expired };
+};
+
+// ============================================
+// VIRTUALS
+// ============================================
+
+// Full address virtual
+userSchema.virtual('fullAddress').get(function() {
+    if (!this.address) return '';
+    const parts = [
+        this.address.street,
+        this.address.area,
+        this.address.city,
+        this.address.state,
+        this.address.pincode
+    ].filter(Boolean);
+    return parts.join(', ');
+});
+
+// ============================================
+// INDEXES
+// ============================================
+
+userSchema.index({ email: 1 });
+userSchema.index({ membershipId: 1 });
+userSchema.index({ isMember: 1, membershipExpiry: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ createdAt: -1 });
+
+// ============================================
+// EXPORT
+// ============================================
+
+module.exports = mongoose.model('User', userSchema);
